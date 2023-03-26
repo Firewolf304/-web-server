@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "coroutine_source.cpp"
+
 #include <iostream>
 
 #include <time.h>
@@ -17,9 +18,81 @@ typedef int sock_handle;
 
 sockaddr_in servAddr;           // address data
 sock_handle sock;               // socket handle
-uint port = 80;                 // port
+uint port = 81;                 // port
 char * ipAddr = "127.0.0.1";    // ip
+namespace requester{
+    typedef struct about{
+        char ** body;
+        int lenght;
+    } headers;
 
+    typedef struct req{
+        char ** data;
+        int lenght;
+    } request;
+
+    struct request_data{
+        bool empty = false;
+        request request_info;
+        headers headers_info;
+    };
+
+    char ** splitter(char * buffer, int size_buffer, int *lenght, char simb)
+    {
+        *lenght = 0;
+        char ** data = (char **)malloc(2);
+        data[*lenght] = (char*)malloc(2);
+        for(int i = 0, k = 0; i < ::strlen(buffer); i++, k++)
+        {
+            int s = sizeof(data);
+            int j = sizeof(data[*lenght]);
+            //cout  << i << " " << buffer[i] << " " << sizeof(buffer[i]) << " " << sizeof(data) + sizeof(buffer[i]) + 20 << " " << sizeof(data[*lenght]) + sizeof(buffer[i]) + 20 << endl;
+            //data = (char**)realloc(data, sizeof(data) + sizeof(buffer[i]) + 20);
+            //data[*lenght] = (char*)::realloc(data[*lenght], sizeof(data[*lenght]) + sizeof(buffer[i]) + 20);
+            data = (char**)realloc(data, ((*lenght)+1) * sizeof(data) + 1);
+            data[*lenght] = (char*)::realloc(data[*lenght], sizeof(data[*lenght]) * (k+1) + 1);
+            if(buffer[i] == simb){
+                k = -1;
+                (*lenght)++;
+                data[*lenght] = (char*)malloc(2);
+            }
+            else {
+
+                data[*lenght][k] = buffer[i];
+                //cout << "res-" << data[*lenght] << endl;
+            }
+        }
+        (*lenght)++;
+        return data;
+    }
+
+    int get_request(char * buffer, request_data * data)
+    {
+        try {
+            //jthread outter;
+            //co_await switch_to_new_thread(outter);
+            //int split_info_lenght = 0;
+            //char ** split_info =
+            //char ** line = splitter(split_info[0], sizeof(split_info[0]), &lenght, '\n');
+            headers info;
+            info.body = splitter(buffer, sizeof(buffer), &info.lenght, '\n');
+
+            request line;
+            line.data = splitter(info.body[0], sizeof(info.body[0]), &info.lenght, ' ');
+
+            data->headers_info = info;
+            data->request_info = line;
+
+            //outter.detach();
+            //outter.join();
+        }
+        catch (const std::exception e) {}
+        return 1;
+    }
+
+
+
+}
 
 namespace log{
 
@@ -55,7 +128,7 @@ namespace log{
 
         }
     }
-    task log_chat(char * name, type_log type, char * message, sockaddr_in * client_data = NULL)
+    task log_chat(char * name, type_log type, basic_string<char> message, sockaddr_in * client_data = NULL)
     /*Logging system, for type: LOG=0|DEBUG=1|MESSAGE=2|WARNING=3|ERROR=4|TEST=5*/
     {
         jthread out;
@@ -69,15 +142,22 @@ namespace log{
             cout << "[" << inet_ntoa(client_data->sin_addr) << ":" << ntohs(client_data->sin_port) << "]";
         }
 
+
         cout << " => " << message << "\n";
         out.detach();
         out.join();
     }
 }
 
+
 task check( sockaddr_in client, int client_handle );
 
 int main(int len, char * argv[]) {
+
+    /*char buffer[20] = "adaw\nbzsc\nc\nj";
+    int lenght;
+    char **data = ::request::split( buffer, sizeof(buffer), &lenght, '\n');
+    cout << lenght << data[lenght-1];*/
     //ipAddr = argv[1];
     //port = ::atoi(argv[2]);
     std::cout << "Hello, World!" << std::endl;
@@ -117,6 +197,11 @@ task check( sockaddr_in client, int client_handle )
         char buffer [4096];
         recv(client_handle, &buffer, sizeof(buffer), 0);
         ::log::log_chat("CLIENT", log::type_log::DEBUG, "Connected client", &client);
+        ::requester::request_data info;
+        ::requester::get_request(buffer, &info);
+        ::log::log_chat("CLIENT", log::type_log::DEBUG, (string)"Request data: Method - " + (string)(info.request_info.data[0]) +
+                ", path - " + (string)(info.request_info.data[1]) + ", protocol - " + (string)(info.request_info.data[2]),&client);
+        //::log::log_chat("CLIENT", log::type_log::MESSAGE, buffer, &client);
         //cout << "TIME NOW: " << timer << endl;
         //recv(client_handle, timer, sizeof(timer), MSG_CONFIRM);
         write(client_handle, timer, strlen(timer));
@@ -129,9 +214,10 @@ task check( sockaddr_in client, int client_handle )
 }
 
 /*
- int a = 1; 0xFFFFFFFF
- int a();   0xFFFFFFF1
-    ///////
-     ///////
+        стратегия:
+        GET /123 HTTP/1.1 -> split(" ") => check => [0] - метод [1] - path [2] - protocol
+        header: *body*
+
+
  */
 

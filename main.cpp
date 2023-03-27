@@ -14,20 +14,21 @@
 #include <type_traits>
 using namespace::std;
 typedef int sock_handle;
-
+#include <sstream>
+#include <vector>
 
 sockaddr_in servAddr;           // address data
 sock_handle sock;               // socket handle
-uint port = 81;                 // port
+uint port = 80;                 // port
 char * ipAddr = "127.0.0.1";    // ip
 namespace requester{
     typedef struct about{
-        char ** body;
+        vector<string> body;
         int lenght;
     } headers;
 
     typedef struct req{
-        char ** data;
+        vector<string> data;
         int lenght;
     } request;
 
@@ -37,7 +38,7 @@ namespace requester{
         headers headers_info;
     };
 
-    char ** splitter(char * buffer, int size_buffer, int *lenght, char simb)
+    char ** splitter(char * buffer, int size_buffer, int *lenght, char simb)    // утечка
     {
         *lenght = 0;
         char ** data = (char **)malloc(2);
@@ -65,6 +66,17 @@ namespace requester{
         (*lenght)++;
         return data;
     }
+    std::vector<std::string> save_split (const std::string &s, char simp) {
+        std::vector<std::string> result;
+        std::stringstream ss (s);
+        std::string item;
+
+        while (getline (ss, item, simp)) {
+            result.push_back (item);
+        }
+
+        return result;
+    }
 
     int get_request(char * buffer, request_data * data)
     {
@@ -75,10 +87,10 @@ namespace requester{
             //char ** split_info =
             //char ** line = splitter(split_info[0], sizeof(split_info[0]), &lenght, '\n');
             headers info;
-            info.body = splitter(buffer, sizeof(buffer), &info.lenght, '\n');
+            info.body = save_split(buffer, '\n'); //splitter(buffer, sizeof(buffer), &info.lenght, '\n');
 
             request line;
-            line.data = splitter(info.body[0], sizeof(info.body[0]), &info.lenght, ' ');
+            line.data = save_split(info.body[0], ' ');//splitter(info.body[0], sizeof(info.body[0]), &info.lenght, ' ');
 
             data->headers_info = info;
             data->request_info = line;
@@ -154,6 +166,16 @@ task check( sockaddr_in client, int client_handle );
 
 int main(int len, char * argv[]) {
 
+    /*while(true)
+    {
+        char buffer[4096] = " GET /123 1.1\nHost: 127.0.0.1:81\nConnection: keep-alive\nCache-Control: max-age=0\nsec-ch-ua-mobile: ?0\nsec-ch-ua-platform: ";
+        int lenght;
+        vector<string> data = requester::save_split(buffer, '\n');
+        //char **data = ::requester::splitter( buffer, sizeof(buffer), &lenght, '\n');
+        cout << lenght << " " << data[1] << endl;
+        //sleep(1);
+    }
+    exit(0);*/
     /*char buffer[20] = "adaw\nbzsc\nc\nj";
     int lenght;
     char **data = ::request::split( buffer, sizeof(buffer), &lenght, '\n');
@@ -187,30 +209,28 @@ int main(int len, char * argv[]) {
 
 task check( sockaddr_in client, int client_handle )
 {
-    try {
-        //cout << "Coroutine started on thread: " << this_thread::get_id() << '\n';
-        jthread out;
-        co_await switch_to_new_thread(out);
-        //cout << "test coroutine for " << inet_ntoa(client.sin_addr) << ":" << ntohs(client.sin_port) << "\n";
-        auto time = chrono::system_clock::to_time_t(chrono::system_clock::now());
-        char * timer = ctime( &time );
-        char buffer [4096];
-        recv(client_handle, &buffer, sizeof(buffer), 0);
-        ::log::log_chat("CLIENT", log::type_log::DEBUG, "Connected client", &client);
-        ::requester::request_data info;
-        ::requester::get_request(buffer, &info);
-        ::log::log_chat("CLIENT", log::type_log::DEBUG, (string)"Request data: Method - " + (string)(info.request_info.data[0]) +
-                ", path - " + (string)(info.request_info.data[1]) + ", protocol - " + (string)(info.request_info.data[2]),&client);
-        //::log::log_chat("CLIENT", log::type_log::MESSAGE, buffer, &client);
-        //cout << "TIME NOW: " << timer << endl;
-        //recv(client_handle, timer, sizeof(timer), MSG_CONFIRM);
-        write(client_handle, timer, strlen(timer));
-        close(client_handle);
-        // end
-        out.detach();
-        out.join();
-    }
-    catch (const std::exception e) {}
+
+    //cout << "Coroutine started on thread: " << this_thread::get_id() << '\n';
+    jthread out;
+    co_await switch_to_new_thread(out);
+    auto time = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    char * timer = ctime( &time );
+    char buffer [4096];
+    recv(client_handle, &buffer, sizeof(buffer), 0);
+    ::log::log_chat("CLIENT", log::type_log::DEBUG, "Connected client", &client);
+    ::requester::request_data info;
+    ::requester::get_request(buffer, &info);
+    ::log::log_chat("CLIENT", log::type_log::DEBUG, (string)"Request data: Method - " + (string)(info.request_info.data[0]) +
+                                                    ", path - " + (string)(info.request_info.data[1]) + ", protocol - " + (string)(info.request_info.data[2]),&client);
+    //::log::log_chat("CLIENT", log::type_log::MESSAGE, buffer, &client);
+    //cout << "TIME NOW: " << timer << endl;
+    //recv(client_handle, timer, sizeof(timer), MSG_CONFIRM);
+    write(client_handle, timer, strlen(timer));
+    close(client_handle);
+    // end
+    out.detach();
+    out.join();
+
 }
 
 /*

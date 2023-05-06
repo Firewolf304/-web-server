@@ -13,6 +13,7 @@
 #include <time.h>
 #include <type_traits>
 using namespace::std;
+
 typedef int sock_handle;
 #include <sstream>
 #include <vector>
@@ -20,13 +21,13 @@ typedef int sock_handle;
 #include <filesystem>
 #include <zlib.h>
 #include <fstream>
-#include "check_response.cpp"
+#include "response.cpp"
 sockaddr_in servAddr;           // address data
 sock_handle sock;               // socket handle
-uint port = 82;                 // port
+uint port = 80;                 // port
 char * ipAddr = "127.0.0.1";    // ip
 
-namespace log{
+namespace firewolf::logger{
 
     enum class type_log : int{
         LOG = 0,
@@ -60,7 +61,7 @@ namespace log{
 
         }
     }
-    task log_chat(char * name, type_log type, basic_string<char> message, sockaddr_in * client_data = NULL)
+    task log_chat(char * name, type_log type, basic_string<char> message, sockaddr_in * client_data = NULL) // make stream?
     /*Logging system, for type: LOG=0|DEBUG=1|MESSAGE=2|WARNING=3|ERROR=4|TEST=5*/
     {
         jthread out;
@@ -82,118 +83,8 @@ namespace log{
 }
 
 
-namespace requester{
-    typedef struct about{
-        vector<string> body;
-        int lenght;
-    } headers;
 
-    typedef struct req{
-        vector<string> data;
-        int lenght;
-    } request;
-
-    struct request_data{
-        bool empty = true;
-        request request_info;
-        headers headers_info;
-    };
-
-    struct body{
-
-    };
-
-    /*char ** splitter(char * buffer, int size_buffer, int *lenght, char simb)    // утечка
-    {
-        *lenght = 0;
-        char ** data = (char **)malloc(2);
-        data[*lenght] = (char*)malloc(2);
-        for(int i = 0, k = 0; i < ::strlen(buffer); i++, k++)
-        {
-            int s = sizeof(data);
-            int j = sizeof(data[*lenght]);
-            //cout  << i << " " << buffer[i] << " " << sizeof(buffer[i]) << " " << sizeof(data) + sizeof(buffer[i]) + 20 << " " << sizeof(data[*lenght]) + sizeof(buffer[i]) + 20 << endl;
-            //data = (char**)realloc(data, sizeof(data) + sizeof(buffer[i]) + 20);
-            //data[*lenght] = (char*)::realloc(data[*lenght], sizeof(data[*lenght]) + sizeof(buffer[i]) + 20);
-            data = (char**)realloc(data, ((*lenght)+1) * sizeof(data) + 1);
-            data[*lenght] = (char*)::realloc(data[*lenght], sizeof(data[*lenght]) * (k+1) + 1);
-            if(buffer[i] == simb){
-                k = -1;
-                (*lenght)++;
-                data[*lenght] = (char*)malloc(2);
-            }
-            else {
-
-                data[*lenght][k] = buffer[i];
-                //cout << "res-" << data[*lenght] << endl;
-            }
-        }
-        (*lenght)++;
-        return data;
-    }*/
-    std::vector<std::string> save_split (const std::string &s, char simp) {
-        std::vector<std::string> result;
-        std::stringstream ss (s);
-        std::string item;
-
-        while (getline (ss, item, simp)) {
-            result.push_back (item);
-        }
-
-        return result;
-    }
-
-    int get_request(char * buffer, request_data * data)
-    {
-        try {
-            //jthread outter;
-            //co_await switch_to_new_thread(outter);
-            //int split_info_lenght = 0;
-            //char ** split_info =
-            //char ** line = splitter(split_info[0], sizeof(split_info[0]), &lenght, '\n');
-            headers info;
-            info.body = save_split(buffer, '\n'); //splitter(buffer, sizeof(buffer), &info.lenght, '\n');
-
-            request line;
-            line.data = save_split(info.body[0], ' ');//splitter(info.body[0], sizeof(info.body[0]), &info.lenght, ' ');
-
-            data->headers_info = info;
-            data->request_info = line;
-            data->empty = false;
-            //outter.detach();
-            //outter.join();
-        }
-        catch (const std::exception e) {}
-        return 1;
-    }
-    class check_path{
-    public:
-        string path = "";
-        bool is_dir()
-        {
-            const filesystem::path fpath(path); // Constructing the path from a string is possible.
-            std::error_code ec;
-            return is_directory(fpath);
-
-        }
-    };
-
-
-}
-namespace responser{
-    typedef struct body{
-        vector<vector<string>> headers;
-    };
-    class response{
-    public:
-        string header_body = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n";
-        string body_text;
-        string make_request(){
-            return header_body + "Content-Length: " + to_string(body_text.length()) + "\r\n\r\n" + body_text;
-        }
-    };
-
-}
+using namespace::firewolf;
 task check( sockaddr_in client, int client_handle );
 string path;
 int main(int len, char * argv[]) {
@@ -263,12 +154,13 @@ task check( sockaddr_in client, int client_handle )
     char * timer = ctime( &time );
     char buffer [4096];
     recv(client_handle, &buffer, sizeof(buffer), 0);
-    ::log::log_chat("CLIENT", log::type_log::DEBUG, "Connected client", &client);
+    ::logger::log_chat("CLIENT", logger::type_log::DEBUG, "Connected client", &client);
     ::requester::request_data info;
     ::requester::get_request(buffer, &info);
-    if(info.request_info.data[1] == "/") { info.request_info.data[1] = ""; }
-    ::log::log_chat("CLIENT", log::type_log::DEBUG, (string)"Request data: Method - " + (string)(info.request_info.data[0]) +
-                                                    ", path - " + (string)(info.request_info.data[1]) + ", protocol - " + (string)(info.request_info.data[2]),&client);
+    memset(&buffer, 0, sizeof(buffer));
+    if(info.request_info.path == "/") { info.request_info.path = ""; }
+    ::logger::log_chat("CLIENT", logger::type_log::DEBUG, (string)"Request data: Method - " + (string)(info.request_info.method) +
+    ", path - " + (string)(info.request_info.path) + ", media_path - " + (string)(info.request_info.media_path) + ", body - " + (string)(info.body),&client);
     //::log::log_chat("CLIENT", log::type_log::MESSAGE, buffer, &client);
     //cout << "TIME NOW: " << timer << endl;
     //recv(client_handle, timer, sizeof(timer), MSG_CONFIRM);
@@ -278,32 +170,46 @@ task check( sockaddr_in client, int client_handle )
     //compress_files(compressed_data, path + PAGE_PATH + info.request_info.data[1]);
     try {
         requester::check_path data;
-        data.path = path + PAGE_PATH + info.request_info.data[1];
-        ::log::log_chat("SERVER", log::type_log::DEBUG, "Trying check by path: " + (string)(data.is_dir() ? data.path + "/main.html" : data.path) + ", compressing", &client);
-        stringstream compressedBuffer;
-        boost::iostreams::filtering_streambuf<boost::iostreams::input> inbuf;
-        inbuf.push(boost::iostreams::gzip_compressor());
-        ifstream file((data.is_dir() ? data.path + "/main.html" : data.path), ios::binary);
-        inbuf.push(file);
-        boost::iostreams::copy(inbuf, compressedBuffer);
-        compressed_data = compressedBuffer.str(); // оно нахуй работает
-        inbuf.pop();
-        file.close();
-        boost::iostreams::close(inbuf);
+        data.path = path + PAGE_PATH + info.request_info.path;
+        ::logger::log_chat("SERVER", logger::type_log::DEBUG, "Trying check by path: " + (string)(data.is_dir() ? data.path + "/main.html" : data.path), &client);
         responser::response rep;
         struct utsname unameData;
         uname(&unameData);
-        rep.header_body += "Content-Type: text/html\r\nContent-Encoding: gzip\r\nAccept-Encoding: gzip, deflate\r\n"
+        rep.header_body += "Content-Type: text/html\r\n"
                            "Architecture: " + (string)(unameData.machine) + "\r\n"
                            "System: " + (string)(unameData.sysname) + "\r\n"
                            "Version: " + (string)(unameData.version) + "\r\n"
                            "Release: " + (string)(unameData.release) + "\r\n"
                            "Name: C++ linux server\r\n";
+        api app;
+        if(app.is_api(info.request_info.path)){
+            try {
+                 ::logger::log_chat("SERVER", logger::type_log::DEBUG, "This is a api", &client);
+            } catch(const exception err){}
+            app.routes[info.request_info.path](&compressed_data, &rep, info);
+        }
+        else {
+            ::logger::log_chat("SERVER", logger::type_log::DEBUG, "This is a resource", &client);
+            rep.header_body += "Content-Encoding: gzip\r\nAccept-Encoding: gzip, deflate\r\n";
+            // compress
+            stringstream compressedBuffer;
+            boost::iostreams::filtering_streambuf<boost::iostreams::input> inbuf;
+            inbuf.push(boost::iostreams::gzip_compressor());
+            ifstream file((data.is_dir() ? data.path + "/main.html" : data.path), ios::binary);
+            inbuf.push(file);
+            boost::iostreams::copy(inbuf, compressedBuffer);
+            compressed_data = compressedBuffer.str(); // оно нахуй работает
+            inbuf.pop();
+            file.close();
+            boost::iostreams::close(inbuf);
+
+            // compress
+        }
         rep.body_text += compressed_data;
         send(client_handle, rep.make_request().c_str(),
              rep.make_request().length(), 0);
     } catch (const std::exception& ex) {
-        ::log::log_chat("SERVER", log::type_log::ERROR, "Error: " + (string)ex.what() + "\n Try check page: " + info.request_info.data[1], &client);
+        ::logger::log_chat("SERVER", logger::type_log::ERROR, "Error: " + (string)ex.what() + "\n Try check page: " + info.request_info.path, &client);
         compressed_data = "Error response";
 
     }

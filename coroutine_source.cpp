@@ -4,7 +4,6 @@
 #include <coroutine>
 #include <thread>
 #include <iostream>
-using namespace::std;
 
 /*static auto switch_to_new_thread(jthread& out) // async func
 {
@@ -63,14 +62,14 @@ struct task // tasker coroutine
     };
     struct awaitable
     {
-        jthread* p_out;
+        std::jthread* p_out;
         bool await_ready() { return false; }
-        void await_suspend(coroutine_handle<> h) // changer
+        void await_suspend(std::coroutine_handle<> h) // changer
         {
-            jthread& out = *p_out;
+            std::jthread& out = *p_out;
             if (out.joinable())
-                throw runtime_error("Output jthread parameter not empty");
-            out = jthread([h] { h.resume(); }); // lambda resume
+                throw std::runtime_error("Output jthread parameter not empty");
+            out = std::jthread([h] { h.resume(); }); // lambda resume
             std::cout << "New thread: " << out.get_id() << '\n'; // this is OK
         }
         void await_resume() {}
@@ -78,7 +77,7 @@ struct task // tasker coroutine
 
 };
 template <typename T>
-struct Generator
+struct _gentask
 {
     struct promise_type;
     using handle_type = std::coroutine_handle<promise_type>;
@@ -88,7 +87,11 @@ struct Generator
         T value_;
         std::exception_ptr exception_;
 
-        Generator get_return_object()
+        _gentask Generator(std::coroutine_handle<promise_type> handle) {
+            return _gentask(std::__n4861::coroutine_handle());
+        }
+
+        _gentask get_return_object()
         {
             return Generator(handle_type::from_promise(*this));
         }
@@ -108,11 +111,11 @@ struct Generator
 
     handle_type h_;
 
-    Generator(handle_type h)
+    _gentask(handle_type h)
             : h_(h)
     {
     }
-    ~Generator() { h_.destroy(); }
+    ~_gentask() { h_.destroy(); }
     explicit operator bool()
     {
         fill();
@@ -143,19 +146,19 @@ private:
 };
 struct awaitable
 {
-    jthread* p_out;
+    std::jthread* p_out;
     bool await_ready() { return false; }
-    void await_suspend(coroutine_handle<> h) // changer
+    void await_suspend(std::coroutine_handle<> h) // changer
     {
-        jthread& out = *p_out;
+        std::jthread& out = *p_out;
         if (out.joinable())
-            throw runtime_error("Output jthread parameter not empty");
-        out = jthread([h] { h.resume(); }); // lambda resume
+            throw std::runtime_error("Output jthread parameter not empty");
+        out = std::jthread([h] { h.resume(); }); // lambda resume
         //std::cout << "New thread: " << out.get_id() << '\n'; // this is OK
     }
     void await_resume() {}
 };
-static auto switch_to_new_thread(jthread& out) // async func
+static auto switch_to_new_thread(std::jthread& out) // async func
 {
     return awaitable{&out}; // send new awaible with new thread
 }
